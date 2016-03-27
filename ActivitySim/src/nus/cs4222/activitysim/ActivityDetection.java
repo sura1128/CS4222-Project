@@ -60,6 +60,10 @@ public class ActivityDetection {
   private int accIndex = 0;
   private float WALK_THRESHOLD = 4;
 
+  //VEHICLE
+  private double userSpeed=0;
+  private double SPEED_THRESHOLD = 1.9;
+
   // LIGHT
   private float LIGHT_THRESHOLD_INDOOR = 100;
   private float LIGHT_THRESHOLD_OUTDOOR = 500;
@@ -296,6 +300,7 @@ public class ActivityDetection {
    */
   public void onLocationSensorChanged(long timestamp, String provider, double latitude, double longitude,
       float accuracy, double altitude, float bearing, float speed) {
+      userSpeed = speed;
   }
 
   private float getMedian(float in_array[]) {
@@ -329,7 +334,6 @@ public class ActivityDetection {
       // Dummy example of outputting a detected activity
       // (to the file "DetectedActivities.txt" in the trace folder).
       // (here we just alternate between indoor and walking every 10 min)
-      System.out.println("light " + lightSensorClean);
 
       if (isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
         isUserOutside = false;
@@ -344,19 +348,23 @@ public class ActivityDetection {
       if (isUserOutside) {
         switch (currentActivity) {
         case WALKING:
+          System.out.println("Speed " + userSpeed);
+            if (userSpeed > SPEED_THRESHOLD ) {
+              currentActivity = UserActivities.BUS;
+            }
         break;
         case BUS:
         case TRAIN:
         case CAR:
-          if (getStandardDeviation() > WALK_THRESHOLD) {
+          if (getStandardDeviation() > WALK_THRESHOLD && userSpeed < SPEED_THRESHOLD) {
             currentActivity = UserActivities.WALKING;
-          }
+          } 
         break;
         case IDLE_OUTDOOR:
         System.out.println(getStandardDeviation());
           if (getStandardDeviation() > WALK_THRESHOLD) {
             System.out.println(" Walking now ");
-            currentActivity = UserActivities.WALKING;
+            currentActivity = UserActivities.WALKING;            
           }
         break;
         default:
@@ -368,7 +376,7 @@ public class ActivityDetection {
 
       // Set a second timer to execute the same task 10 min later
       ++numberTimers;
-      if (numberTimers <= 20000) {
+      if (numberTimers <= 5000) {
         SimulatorTimer timer = new SimulatorTimer();
         timer.schedule(task, // Task to be executed
             1 * 1000); // Delay in millisec (10 min)
