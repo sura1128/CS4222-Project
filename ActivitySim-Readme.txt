@@ -20,4 +20,4 @@ While executing the program, you must provide a path to the folder
 Compiling:
  $ ant jarify
 Executing:
- $ java -jar ActivitySim.jar C:\Users\suran\Documents\NUS\NUS Modules\CS4222\Project\Nexus 4
+ $ java -jar ActivitySim.jar ../nexus4
