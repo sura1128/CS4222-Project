@@ -50,13 +50,15 @@ public class ActivityDetection {
   private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-h-mm-ssa");
   private boolean isFirstAcclReading = true;
   private int numberTimers = 1;
-  private int currentActivity = 0;
+
+  // String for Current Activity
+  private UserActivities currentActivity = UserActivities.IDLE_INDOOR;
 
   // ACCELEROMETER
   private int BUFFER_SIZE = 30;
   private float acclBuffer[][] = new float[3][BUFFER_SIZE];
   private int accIndex = 0;
-  private float WALK_THRESHOLD = 20;
+  private float WALK_THRESHOLD = 4;
 
   // LIGHT
   private float LIGHT_THRESHOLD_INDOOR = 100;
@@ -157,8 +159,7 @@ public class ActivityDetection {
     for (int i = 0; i < BUFFER_SIZE; i++) {
       sum += Math.pow((getMagnitude(i) - mean), 2);
     }
-
-    double stdDev = Math.sqrt((1 / BUFFER_SIZE) * sum);
+    double stdDev = Math.sqrt((1.0 / (double)BUFFER_SIZE) * sum);
     return stdDev;
   }
 
@@ -328,25 +329,33 @@ public class ActivityDetection {
       // Dummy example of outputting a detected activity
       // (to the file "DetectedActivities.txt" in the trace folder).
       // (here we just alternate between indoor and walking every 10 min)
+      System.out.println("light " + lightSensorClean);
+
       if (isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
         isUserOutside = false;
         currentActivity = UserActivities.IDLE_INDOOR;
+        System.out.println("first " + lightSensorClean);
       } else if (!isUserOutside && (lightSensorClean > LIGHT_THRESHOLD_OUTDOOR)) {
         isUserOutside = true;
-        // currentActivity = UserActivities.IDLE_OUTDOOR;
-      }
+        currentActivity = UserActivities.IDLE_OUTDOOR;
+        System.out.println("second " + lightSensorClean);
+      } 
 
       if (isUserOutside) {
         switch (currentActivity) {
-        case UserActivities.WALKING:
+        case WALKING:
         break;
-        case UserActivities.VEHICLE:
+        case BUS:
+        case TRAIN:
+        case CAR:
           if (getStandardDeviation() > WALK_THRESHOLD) {
             currentActivity = UserActivities.WALKING;
           }
         break;
-        case UserActivities.IDLE_OUTDOOR:
+        case IDLE_OUTDOOR:
+        System.out.println(getStandardDeviation());
           if (getStandardDeviation() > WALK_THRESHOLD) {
+            System.out.println(" Walking now ");
             currentActivity = UserActivities.WALKING;
           }
         break;
@@ -359,7 +368,7 @@ public class ActivityDetection {
 
       // Set a second timer to execute the same task 10 min later
       ++numberTimers;
-      if (numberTimers <= 2) {
+      if (numberTimers <= 20000) {
         SimulatorTimer timer = new SimulatorTimer();
         timer.schedule(task, // Task to be executed
             1 * 1000); // Delay in millisec (10 min)
