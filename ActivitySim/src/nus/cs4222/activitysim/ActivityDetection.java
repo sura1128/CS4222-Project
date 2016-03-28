@@ -64,6 +64,15 @@ public class ActivityDetection {
   private double userSpeed=0;
   private double SPEED_THRESHOLD = 1.9;
 
+  //Location
+  private boolean calculateGPS=false;
+  private int LOCATION_BUFF_SIZE=5;
+  private double locationBuffer[][] = new double[LOCATION_BUFF_SIZE][2];
+  private boolean hasMoved = false;
+  private int locationIndex=0;
+  private double latStdDev = 0.0;
+  private double longStdDev = 0.0;
+
   // LIGHT
   private float LIGHT_THRESHOLD_INDOOR = 100;
   private float LIGHT_THRESHOLD_OUTDOOR = 500;
@@ -263,6 +272,7 @@ public class ActivityDetection {
     lightIndex = lightIndex % LIGHT_BUFF_SIZE;
     lightSensorFilter[lightIndex] = light;
     lightSensorClean = getMedian(lightSensorFilter);
+    lightIndex++;
   }
 
   /**
@@ -301,7 +311,39 @@ public class ActivityDetection {
   public void onLocationSensorChanged(long timestamp, String provider, double latitude, double longitude,
       float accuracy, double altitude, float bearing, float speed) {
       userSpeed = speed;
+      calculateGPS = true;
+
+      locationIndex++;
+      locationIndex = locationIndex % LOCATION_BUFF_SIZE;
+
+      locationBuffer[locationIndex][0] = latitude;
+      locationBuffer[locationIndex][1] = longitude;
+
+
+      latStdDev = getStdDevLocation(0); //locationindex = 0 for latitude, 1 for longitude
+      longStdDev = getStdDevLocation(1);
+
+
   }
+
+  private double getStdDevLocation(int locationIndex) {
+    double mean = getLocationMean(locationIndex);
+    double sum = 0.0;
+    for (int i = 0; i < LOCATION_BUFF_SIZE; i++) {
+      sum += Math.pow((locationBuffer[i][locationIndex]- mean), 2);
+    }
+    double stdDev = Math.sqrt((1.0 / (double)LOCATION_BUFF_SIZE) * sum);
+    return stdDev;
+  }
+
+  private double getLocationMean(int locationIndex){
+     double sum = 0.0;
+    for (int j = 0; j < LOCATION_BUFF_SIZE; j++) {
+      sum += locationBuffer[j][locationIndex];
+    }
+    return sum / (float) LOCATION_BUFF_SIZE;
+  }
+
 
   private float getMedian(float in_array[]) {
     Arrays.sort(in_array);
@@ -335,20 +377,20 @@ public class ActivityDetection {
       // (to the file "DetectedActivities.txt" in the trace folder).
       // (here we just alternate between indoor and walking every 10 min)
 
-      if (isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
+     
+
+      if ((currentActivity != UserActivities.CAR) || (currentActivity != UserActivities.BUS) || (currentActivity != UserActivities.TRAIN)) {
+         if (isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
         isUserOutside = false;
         currentActivity = UserActivities.IDLE_INDOOR;
-        System.out.println("first " + lightSensorClean);
       } else if (!isUserOutside && (lightSensorClean > LIGHT_THRESHOLD_OUTDOOR)) {
         isUserOutside = true;
         currentActivity = UserActivities.IDLE_OUTDOOR;
-        System.out.println("second " + lightSensorClean);
       } 
-
-      if (isUserOutside) {
+      } else {
+         if (isUserOutside) {
         switch (currentActivity) {
         case WALKING:
-          System.out.println("Speed " + userSpeed);
             if (userSpeed > SPEED_THRESHOLD ) {
               currentActivity = UserActivities.BUS;
             }
@@ -356,12 +398,15 @@ public class ActivityDetection {
         case BUS:
         case TRAIN:
         case CAR:
-          if (getStandardDeviation() > WALK_THRESHOLD && userSpeed < SPEED_THRESHOLD) {
+        if (calculateGPS) {
+          System.out.println("Deviation in location " + latStdDev + " " + longStdDev);
+          if ((getStandardDeviation() > WALK_THRESHOLD) && (userSpeed < SPEED_THRESHOLD)) {
             currentActivity = UserActivities.WALKING;
           } 
+        }
+          
         break;
         case IDLE_OUTDOOR:
-        System.out.println(getStandardDeviation());
           if (getStandardDeviation() > WALK_THRESHOLD) {
             System.out.println(" Walking now ");
             currentActivity = UserActivities.WALKING;            
@@ -372,6 +417,8 @@ public class ActivityDetection {
         }
       }
 
+      }
+     
       ActivitySimulator.outputDetectedActivity(currentActivity);
 
       // Set a second timer to execute the same task 10 min later
