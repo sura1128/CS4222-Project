@@ -45,6 +45,8 @@ import android.util.*;
  * need not be modified.
  */
 public class ActivityDetection {
+  /*init */
+  private boolean initDone = false;
 
   /** To format the UNIX millis time as a human-readable string. */
   private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-h-mm-ssa");
@@ -60,18 +62,22 @@ public class ActivityDetection {
   private int accIndex = 0;
   private float WALK_THRESHOLD = 4;
 
-  //VEHICLE
-  private double userSpeed=0;
-  private double SPEED_THRESHOLD = 1.9;
+  private boolean isWalking = false;
 
   //Location
   private boolean calculateGPS=false;
   private int LOCATION_BUFF_SIZE=5;
-  private double locationBuffer[][] = new double[LOCATION_BUFF_SIZE][2];
+  private double locationBuffer[][] = new double[LOCATION_BUFF_SIZE][3];
   private boolean hasMoved = false;
   private int locationIndex=0;
   private double latStdDev = 0.0;
   private double longStdDev = 0.0;
+
+   //VEHICLE
+  private double userSpeed=0;
+  private double userSpeedCoarse=0;
+  private double SPEED_THRESHOLD = 1.9;
+  private boolean isMoving = false;
 
   // LIGHT
   private float LIGHT_THRESHOLD_INDOOR = 100;
@@ -79,9 +85,12 @@ public class ActivityDetection {
   private int LIGHT_BUFF_SIZE = 10;
   private float lightSensorFilter[] = new float[LIGHT_BUFF_SIZE];
   private int lightIndex = 0;
-
   private float lightSensorClean = 0;
+  
   private boolean isUserOutside = false;
+
+  //PROXIMITY
+  private boolean isInPocket = false;
 
   /**
    * Called when the accelerometer sensor has changed.
@@ -157,11 +166,17 @@ public class ActivityDetection {
     acclBuffer[2][accIndex] = z;
     accIndex++;
 
+    // just to init everything
     if (isFirstAcclReading) {
       isFirstAcclReading = false;
       SimulatorTimer timer = new SimulatorTimer();
       timer.schedule(this.task, // Task to be executed
           10 * 60 * 1000); // Delay in millisec (10 min)
+    }
+    if(getStandardDeviation() > WALK_THRESHOLD){
+      isWalking = true;
+    }else{
+      isWalking = false;
     }
 
   }
@@ -273,6 +288,16 @@ public class ActivityDetection {
     lightSensorFilter[lightIndex] = light;
     lightSensorClean = getMedian(lightSensorFilter);
     lightIndex++;
+
+    if(!isInPocket){
+      if (isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
+        isUserOutside = false;
+      } else if (!isUserOutside && (lightSensorClean > LIGHT_THRESHOLD_OUTDOOR)) {
+        isUserOutside = true;
+      }
+    }else {
+      isUserOutside = true;
+    }
   }
 
   /**
@@ -286,6 +311,11 @@ public class ActivityDetection {
    *            Accuracy of the sensor data (you can ignore this)
    */
   public void onProximitySensorChanged(long timestamp, float proximity, int accuracy) {
+    if(proximity > 0){
+      isInPocket = true;
+    }else{
+      isInPocket = false;
+    }
   }
 
   /**
@@ -311,19 +341,30 @@ public class ActivityDetection {
   public void onLocationSensorChanged(long timestamp, String provider, double latitude, double longitude,
       float accuracy, double altitude, float bearing, float speed) {
       userSpeed = speed;
-      calculateGPS = true;
 
       locationIndex++;
       locationIndex = locationIndex % LOCATION_BUFF_SIZE;
 
       locationBuffer[locationIndex][0] = latitude;
       locationBuffer[locationIndex][1] = longitude;
+      locationBuffer[locationIndex][2] = timestamp;
 
-
-      latStdDev = getStdDevLocation(0); //locationindex = 0 for latitude, 1 for longitude
+      latStdDev = getStdDevLocation(0); //locationIndex = 0 for latitude, 1 for longitude
       longStdDev = getStdDevLocation(1);
+      int prevIndex = (locationIndex-1)%LOCATION_BUFF_SIZE;
 
+      userSpeedCoarse = distance_on_geoid(locationBuffer[locationIndex][0], locationBuffer[locationIndex][1], locationBuffer[prevIndex][0], locationBuffer[prevIndex][1]);
+      userSpeedCoarse = userSpeedCoarse / (locationBuffer[locationIndex][2] - locationBuffer[prevIndex][2]) * 1000000000;
 
+      if(userSpeed > SPEED_THRESHOLD || userSpeedCoarse > SPEED_THRESHOLD){
+        isMoving = true;
+      }else{
+        isMoving = false;
+      }
+
+      if(locationIndex > 1){
+        calculateGPS = true;
+      }    
   }
 
   private double getStdDevLocation(int locationIndex) {
@@ -344,6 +385,39 @@ public class ActivityDetection {
     return sum / (float) LOCATION_BUFF_SIZE;
   }
 
+  private double distance_on_geoid(double lat1, double lon1, double lat2, double lon2) {
+ 
+  // Convert degrees to radians
+  lat1 = lat1 * Math.PI / 180.0;
+  lon1 = lon1 * Math.PI / 180.0;
+ 
+  lat2 = lat2 * Math.PI / 180.0;
+  lon2 = lon2 * Math.PI / 180.0;
+ 
+  // radius of earth in metres
+  double r = 6378100;
+ 
+  // P
+  double rho1 = r * Math.cos(lat1);
+  double z1 = r * Math.sin(lat1);
+  double x1 = rho1 * Math.cos(lon1);
+  double y1 = rho1 * Math.sin(lon1);
+ 
+  // Q
+  double rho2 = r * Math.cos(lat2);
+  double z2 = r * Math.sin(lat2);
+  double x2 = rho2 * Math.cos(lon2);
+  double y2 = rho2 * Math.sin(lon2);
+ 
+  // Dot product
+  double dot = (x1 * x2 + y1 * y2 + z1 * z2);
+  double cos_theta = dot / (r * r);
+ 
+  double theta = Math.acos(cos_theta);
+ 
+  // Distance in Metres
+  return r * theta;
+}
 
   private float getMedian(float in_array[]) {
     Arrays.sort(in_array);
@@ -353,6 +427,48 @@ public class ActivityDetection {
     } else {
       return in_array[(size + 1) / 2];
     }
+  }
+
+  private void changeActivity(){
+    switch (currentActivity) {
+      // can change to walk or vehicle
+      case IDLE_INDOOR:
+      case IDLE_OUTDOOR:
+        if(isWalking) {
+          currentActivity = UserActivities.WALKING;
+        }else if(isMoving){
+          currentActivity = UserActivities.BUS;
+        }
+      break;
+
+      // can change to idle or vehicle
+      case WALKING:
+        if(isMoving) {
+          currentActivity = UserActivities.BUS;
+        }else{
+          if(!isWalking){
+            if(isUserOutside){
+              currentActivity = UserActivities.IDLE_OUTDOOR;
+            }else{
+              currentActivity = UserActivities.IDLE_INDOOR;
+            }
+          }
+        }
+      break;
+
+      // can change to walking;
+      case BUS:
+      case TRAIN:
+      case CAR:
+        if(isWalking) {
+          currentActivity = UserActivities.WALKING;
+        }
+      break;
+
+      default:
+      break;
+    }
+    ActivitySimulator.outputDetectedActivity(currentActivity);
   }
 
   /**
@@ -377,57 +493,28 @@ public class ActivityDetection {
       // (to the file "DetectedActivities.txt" in the trace folder).
       // (here we just alternate between indoor and walking every 10 min)
 
-     
-
-      if ((currentActivity != UserActivities.CAR) || (currentActivity != UserActivities.BUS) || (currentActivity != UserActivities.TRAIN)) {
-         if (isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
-        isUserOutside = false;
+      // wait till first two GPS readings
+     if(!initDone && calculateGPS){
+      if (isMoving) { // if speed > to check for vehicle
+        currentActivity = UserActivities.BUS;
+      }else if(isWalking){// check for walking
+        currentActivity = UserActivities.WALKING;
+      }else if(isUserOutside){// check proximity sensor for pocket and light sensor values
+          currentActivity = UserActivities.IDLE_OUTDOOR;
+      }else{
         currentActivity = UserActivities.IDLE_INDOOR;
-      } else if (!isUserOutside && (lightSensorClean > LIGHT_THRESHOLD_OUTDOOR)) {
-        isUserOutside = true;
-        currentActivity = UserActivities.IDLE_OUTDOOR;
-      } 
-      } else {
-         if (isUserOutside) {
-        switch (currentActivity) {
-        case WALKING:
-            if (userSpeed > SPEED_THRESHOLD ) {
-              currentActivity = UserActivities.BUS;
-            }
-        break;
-        case BUS:
-        case TRAIN:
-        case CAR:
-        if (calculateGPS) {
-          System.out.println("Deviation in location " + latStdDev + " " + longStdDev);
-          if ((getStandardDeviation() > WALK_THRESHOLD) && (userSpeed < SPEED_THRESHOLD)) {
-            currentActivity = UserActivities.WALKING;
-          } 
-        }
-          
-        break;
-        case IDLE_OUTDOOR:
-          if (getStandardDeviation() > WALK_THRESHOLD) {
-            System.out.println(" Walking now ");
-            currentActivity = UserActivities.WALKING;            
-          }
-        break;
-        default:
-        break;
-        }
       }
-
-      }
-     
+      initDone = true;
       ActivitySimulator.outputDetectedActivity(currentActivity);
-
-      // Set a second timer to execute the same task 10 min later
-      ++numberTimers;
-      if (numberTimers <= 5000) {
-        SimulatorTimer timer = new SimulatorTimer();
-        timer.schedule(task, // Task to be executed
-            1 * 1000); // Delay in millisec (10 min)
-      }
+     }else if(initDone){
+        changeActivity();
+     }
+    ++numberTimers;
+    if (numberTimers <= 5000) {
+      SimulatorTimer timer = new SimulatorTimer();
+      timer.schedule(task, // Task to be executed
+          1 * 1000); // Delay in millisec (10 min)
+    }
     }
   };
 }
