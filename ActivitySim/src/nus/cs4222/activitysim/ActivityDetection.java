@@ -57,11 +57,14 @@ public class ActivityDetection {
   private UserActivities currentActivity = UserActivities.IDLE_INDOOR;
 
   // ACCELEROMETER
-  private int BUFFER_SIZE = 30;
+  private int BUFFER_SIZE = 60;
   private float acclBuffer[][] = new float[3][BUFFER_SIZE];
   private int accIndex = 0;
   private double walkSdev = 0;
-  private double WALK_THRESHOLD = 3.0;
+  private double WALK_THRESHOLD = 1.5;
+
+  private double WALK_THRESHOLD_IDLE = 2.5;
+  private double WALK_THRESHOLD_VEHICLE = 3.5;
 
   private boolean isWalking = false;
 
@@ -77,7 +80,7 @@ public class ActivityDetection {
 
    //VEHICLE
   private double userSpeed=0;
-  private double SPEED_THRESHOLD = 2.1;
+  private double SPEED_THRESHOLD = 2.0;
   private boolean isMoving = false;
 
   // LIGHT
@@ -175,14 +178,30 @@ public class ActivityDetection {
           10 * 60 * 1000); // Delay in millisec (10 min)
     }
     walkSdev = getStandardDeviation();
-    System.out.println("walking SD: " + walkSdev);
+    // System.out.println("walking SD: " + walkSdev);
+
+    // if (currentActivity == UserActivities.IDLE_OUTDOOR || currentActivity == UserActivities.IDLE_INDOOR || currentActivity == UserActivities.WALKING ) {
+    //   if(walkSdev > WALK_THRESHOLD_IDLE){
+    //     isWalking = true;
+    //   }else {
+    //     isWalking = false;
+    //   }
+    // }else if ((currentActivity == UserActivities.BUS) || (currentActivity == UserActivities.TRAIN) || (currentActivity == UserActivities.CAR)) {
+    //   if(walkSdev > WALK_THRESHOLD_VEHICLE){
+    //     isWalking = true;
+    //   }else {
+    //     isWalking = false;
+    //   }
+    // }else {
+    //     isWalking = false;
+    // }
 
     if(walkSdev > WALK_THRESHOLD){
-      isWalking = true;
-    }else{
-      isWalking = false;
+        isWalking = true;
+    }else {
+        isWalking = false;
     }
-
+    
   }
 
   double getStandardDeviation() {
@@ -375,8 +394,9 @@ public class ActivityDetection {
         isMoving = false;
       }
 
-      System.out.println("Speed is: " + userSpeed  + " at " + timestamp);
-      System.out.println();
+      // System.out.println("Speed is: " + userSpeed  + " at " + timestamp);
+      // System.out.println("walking SD: " + walkSdev);
+      // System.out.println();
       if(locationIndex > 1){
         calculateGPS = true;
       }
@@ -446,11 +466,12 @@ public class ActivityDetection {
   }
 
   private void changeActivity(){
+    // System.out.println("walking SD: " + walkSdev);
     switch (currentActivity) {
       // can change to walk or vehicle
       case IDLE_INDOOR:
       case IDLE_OUTDOOR:
-        if(isWalking) {
+        if(!isMoving && isWalking) {
             // System.out.println("walking SD: " + walkSdev);
           currentActivity = UserActivities.WALKING;
         }else if(isMoving){
@@ -478,7 +499,7 @@ public class ActivityDetection {
       case BUS:
       case TRAIN:
       case CAR:
-        if(isWalking) {
+        if(!isMoving && isWalking) {
             // System.out.println("walking SD: " + walkSdev);
           currentActivity = UserActivities.WALKING;
         }
@@ -487,6 +508,7 @@ public class ActivityDetection {
       default:
       break;
     }
+    // System.out.println(currentActivity);
     ActivitySimulator.outputDetectedActivity(currentActivity);
   }
 
@@ -528,12 +550,13 @@ public class ActivityDetection {
         System.out.println("hello4");
       }
       initDone = true;
+      System.out.println(currentActivity);
       ActivitySimulator.outputDetectedActivity(currentActivity);
      }else if(initDone){
         changeActivity();
      }
     ++numberTimers;
-    if (numberTimers <= 5000) {
+    if (numberTimers <= 8100) {
       SimulatorTimer timer = new SimulatorTimer();
       timer.schedule(task, // Task to be executed
           1 * 1000); // Delay in millisec (10 min)
