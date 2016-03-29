@@ -80,12 +80,12 @@ public class ActivityDetection {
 
    //VEHICLE
   private double userSpeed=0;
-  private double SPEED_THRESHOLD = 2.0;
+  private double SPEED_THRESHOLD = 2.72;
   private boolean isMoving = false;
 
   // LIGHT
-  private float LIGHT_THRESHOLD_INDOOR = 100;
-  private float LIGHT_THRESHOLD_OUTDOOR = 500;
+  private float LIGHT_THRESHOLD_INDOOR = 220;
+  private float LIGHT_THRESHOLD_OUTDOOR = 350;
   private int LIGHT_BUFF_SIZE = 10;
   private float lightSensorFilter[] = new float[LIGHT_BUFF_SIZE];
   private int lightIndex = 0;
@@ -175,7 +175,7 @@ public class ActivityDetection {
       isFirstAcclReading = false;
       SimulatorTimer timer = new SimulatorTimer();
       timer.schedule(this.task, // Task to be executed
-          10 * 60 * 1000); // Delay in millisec (10 min)
+          1* 1000); // Delay in millisec (10 min)
     }
     walkSdev = getStandardDeviation();
     // System.out.println("walking SD: " + walkSdev);
@@ -312,13 +312,9 @@ public class ActivityDetection {
     lightSensorClean = getMedian(lightSensorFilter);
     lightIndex++;
 
-    if(!isInPocket){
-      if (isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
-        isUserOutside = false;
-      } else if (!isUserOutside && (lightSensorClean > LIGHT_THRESHOLD_OUTDOOR)) {
-        isUserOutside = true;
-      }
-    }else {
+    if (!isInPocket && isUserOutside && (lightSensorClean < LIGHT_THRESHOLD_INDOOR)) {
+      isUserOutside = false;
+    } else if (!isUserOutside && (lightSensorClean > LIGHT_THRESHOLD_OUTDOOR)) {
       isUserOutside = true;
     }
   }
@@ -334,10 +330,10 @@ public class ActivityDetection {
    *            Accuracy of the sensor data (you can ignore this)
    */
   public void onProximitySensorChanged(long timestamp, float proximity, int accuracy) {
-    if(proximity > 0){
-      isInPocket = true;
-    }else{
+    if(proximity > 0.0){
       isInPocket = false;
+    }else{
+      isInPocket = true;
     }
   }
 
@@ -371,8 +367,8 @@ public class ActivityDetection {
       locationBuffer[locationIndex][1] = longitude;
       locationBuffer[locationIndex][2] = (double)timestamp;
 
-      latStdDev = getStdDevLocation(0); //locationIndex = 0 for latitude, 1 for longitude
-      longStdDev = getStdDevLocation(1);
+      // latStdDev = getStdDevLocation(0); //locationIndex = 0 for latitude, 1 for longitude
+      // longStdDev = getStdDevLocation(1);
       int prevIndex = (locationIndex-1)%LOCATION_BUFF_SIZE;
       if(prevIndex < 0){
         prevIndex += LOCATION_BUFF_SIZE;
@@ -401,24 +397,6 @@ public class ActivityDetection {
         calculateGPS = true;
       }
       gpsEvent = true; 
-  }
-
-  private double getStdDevLocation(int locationIndex) {
-    double mean = getLocationMean(locationIndex);
-    double sum = 0.0;
-    for (int i = 0; i < LOCATION_BUFF_SIZE; i++) {
-      sum += Math.pow((locationBuffer[i][locationIndex]- mean), 2);
-    }
-    double stdDev = Math.sqrt((1.0 / (double)LOCATION_BUFF_SIZE) * sum);
-    return stdDev;
-  }
-
-  private double getLocationMean(int locationIndex){
-     double sum = 0.0;
-    for (int j = 0; j < LOCATION_BUFF_SIZE; j++) {
-      sum += locationBuffer[j][locationIndex];
-    }
-    return sum / (float) LOCATION_BUFF_SIZE;
   }
 
   private double distance_on_geoid(double lat1, double lon1, double lat2, double lon2) {
@@ -486,10 +464,13 @@ public class ActivityDetection {
         }else{
           if(!isWalking){
             // System.out.println("walking SD: " + walkSdev);
+            // System.out.println("light value: " + lightSensorClean + "POCKET?: " + isInPocket);
             if(isUserOutside){
               currentActivity = UserActivities.IDLE_OUTDOOR;
+            // System.out.println("OUT");
             }else{
               currentActivity = UserActivities.IDLE_INDOOR;
+            // System.out.println("IN");
             }
           }
         }
@@ -538,19 +519,15 @@ public class ActivityDetection {
      if(!initDone && calculateGPS){
       if (isMoving) { // if speed > to check for vehicle
         currentActivity = UserActivities.BUS;
-        System.out.println("hello1");
       }else if(isWalking){// check for walking
         currentActivity = UserActivities.WALKING;
-        System.out.println("hello2");
       }else if(isUserOutside){// check proximity sensor for pocket and light sensor values
           currentActivity = UserActivities.IDLE_OUTDOOR;
-          System.out.println("hello3");
       }else{
         currentActivity = UserActivities.IDLE_INDOOR;
-        System.out.println("hello4");
       }
       initDone = true;
-      System.out.println(currentActivity);
+      // System.out.println(currentActivity);
       ActivitySimulator.outputDetectedActivity(currentActivity);
      }else if(initDone){
         changeActivity();
