@@ -60,7 +60,8 @@ public class ActivityDetection {
   private int BUFFER_SIZE = 30;
   private float acclBuffer[][] = new float[3][BUFFER_SIZE];
   private int accIndex = 0;
-  private float WALK_THRESHOLD = 4;
+  private double walkSdev = 0;
+  private double WALK_THRESHOLD = 3.0;
 
   private boolean isWalking = false;
 
@@ -72,11 +73,11 @@ public class ActivityDetection {
   private int locationIndex=0;
   private double latStdDev = 0.0;
   private double longStdDev = 0.0;
+  private boolean gpsEvent = false;
 
    //VEHICLE
   private double userSpeed=0;
-  private double userSpeedCoarse=0;
-  private double SPEED_THRESHOLD = 1.9;
+  private double SPEED_THRESHOLD = 2.1;
   private boolean isMoving = false;
 
   // LIGHT
@@ -173,7 +174,10 @@ public class ActivityDetection {
       timer.schedule(this.task, // Task to be executed
           10 * 60 * 1000); // Delay in millisec (10 min)
     }
-    if(getStandardDeviation() > WALK_THRESHOLD){
+    walkSdev = getStandardDeviation();
+    System.out.println("walking SD: " + walkSdev);
+
+    if(walkSdev > WALK_THRESHOLD){
       isWalking = true;
     }else{
       isWalking = false;
@@ -340,31 +344,43 @@ public class ActivityDetection {
    */
   public void onLocationSensorChanged(long timestamp, String provider, double latitude, double longitude,
       float accuracy, double altitude, float bearing, float speed) {
-      userSpeed = speed;
 
       locationIndex++;
       locationIndex = locationIndex % LOCATION_BUFF_SIZE;
 
       locationBuffer[locationIndex][0] = latitude;
       locationBuffer[locationIndex][1] = longitude;
-      locationBuffer[locationIndex][2] = timestamp;
+      locationBuffer[locationIndex][2] = (double)timestamp;
 
       latStdDev = getStdDevLocation(0); //locationIndex = 0 for latitude, 1 for longitude
       longStdDev = getStdDevLocation(1);
       int prevIndex = (locationIndex-1)%LOCATION_BUFF_SIZE;
+      if(prevIndex < 0){
+        prevIndex += LOCATION_BUFF_SIZE;
+      }
 
-      userSpeedCoarse = distance_on_geoid(locationBuffer[locationIndex][0], locationBuffer[locationIndex][1], locationBuffer[prevIndex][0], locationBuffer[prevIndex][1]);
-      userSpeedCoarse = userSpeedCoarse / (locationBuffer[locationIndex][2] - locationBuffer[prevIndex][2]) * 1000000000;
+      if(speed >= 0){
+        userSpeed = speed;
+      }else{
+        double userSpeedCoarse = 0;
+        userSpeedCoarse = distance_on_geoid(locationBuffer[locationIndex][0], locationBuffer[locationIndex][1], locationBuffer[prevIndex][0], locationBuffer[prevIndex][1]);
+        userSpeedCoarse = userSpeedCoarse / (locationBuffer[locationIndex][2] - locationBuffer[prevIndex][2]) * 1000;
 
-      if(userSpeed > SPEED_THRESHOLD || userSpeedCoarse > SPEED_THRESHOLD){
+        userSpeed = userSpeedCoarse;
+      }
+
+      if(userSpeed > SPEED_THRESHOLD){
         isMoving = true;
       }else{
         isMoving = false;
       }
 
+      System.out.println("Speed is: " + userSpeed  + " at " + timestamp);
+      System.out.println();
       if(locationIndex > 1){
         calculateGPS = true;
-      }    
+      }
+      gpsEvent = true; 
   }
 
   private double getStdDevLocation(int locationIndex) {
@@ -435,6 +451,7 @@ public class ActivityDetection {
       case IDLE_INDOOR:
       case IDLE_OUTDOOR:
         if(isWalking) {
+            // System.out.println("walking SD: " + walkSdev);
           currentActivity = UserActivities.WALKING;
         }else if(isMoving){
           currentActivity = UserActivities.BUS;
@@ -447,6 +464,7 @@ public class ActivityDetection {
           currentActivity = UserActivities.BUS;
         }else{
           if(!isWalking){
+            // System.out.println("walking SD: " + walkSdev);
             if(isUserOutside){
               currentActivity = UserActivities.IDLE_OUTDOOR;
             }else{
@@ -461,6 +479,7 @@ public class ActivityDetection {
       case TRAIN:
       case CAR:
         if(isWalking) {
+            // System.out.println("walking SD: " + walkSdev);
           currentActivity = UserActivities.WALKING;
         }
       break;
@@ -480,14 +499,14 @@ public class ActivityDetection {
 
   private Runnable task = new Runnable() {
     public void run() {
-
       // Logging to the DDMS (in the simulator, the DDMS log is to the
       // console)
-      System.out.println();
-      Log.i("ActivitySim", "Timer " + numberTimers + ": Current simulator time: "
-          + convertUnixTimeToReadableString(ActivitySimulator.currentTimeMillis()));
-      System.out.println("Timer " + numberTimers + ": Current simulator time: "
-          + convertUnixTimeToReadableString(ActivitySimulator.currentTimeMillis()));
+
+      // System.out.println();
+      // Log.i("ActivitySim", "Timer " + numberTimers + ": Current simulator time: "
+      //     + convertUnixTimeToReadableString(ActivitySimulator.currentTimeMillis()));
+      // System.out.println("Timer " + numberTimers + ": Current simulator time: "
+      //     + convertUnixTimeToReadableString(ActivitySimulator.currentTimeMillis()));
 
       // Dummy example of outputting a detected activity
       // (to the file "DetectedActivities.txt" in the trace folder).
@@ -497,12 +516,16 @@ public class ActivityDetection {
      if(!initDone && calculateGPS){
       if (isMoving) { // if speed > to check for vehicle
         currentActivity = UserActivities.BUS;
+        System.out.println("hello1");
       }else if(isWalking){// check for walking
         currentActivity = UserActivities.WALKING;
+        System.out.println("hello2");
       }else if(isUserOutside){// check proximity sensor for pocket and light sensor values
           currentActivity = UserActivities.IDLE_OUTDOOR;
+          System.out.println("hello3");
       }else{
         currentActivity = UserActivities.IDLE_INDOOR;
+        System.out.println("hello4");
       }
       initDone = true;
       ActivitySimulator.outputDetectedActivity(currentActivity);
