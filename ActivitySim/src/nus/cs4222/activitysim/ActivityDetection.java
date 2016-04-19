@@ -9,7 +9,7 @@ import android.util.*;
 
 /**
  * Class containing the activity detection algorithm.
- * 
+ *
  * <p>
  * You can code your activity detection algorithm in this class. (You may add
  * more Java class files or add libraries in the 'libs' folder if you need). The
@@ -17,7 +17,7 @@ import android.util.*;
  * increasing order of timestamps. In the best case, you will simply need to
  * copy paste this class file (and any supporting class files and libraries) to
  * the Android app without modification (in stage 2 of the project).
- * 
+ *
  * <p>
  * Remember that your detection algorithm executes as the sensor data arrives
  * one by one. Once you have detected the user's current activity, output it
@@ -26,7 +26,7 @@ import android.util.*;
  * the newly detected activity using the same method, and so on. The detected
  * activities are logged to the file "DetectedActivities.txt", in the same
  * folder as your sensor logs.
- * 
+ *
  * <p>
  * To get the current simulator time, use the method
  * {@link ActivitySimulator.currentTimeMillis()}. You can set timers using the
@@ -35,7 +35,7 @@ import android.util.*;
  * {@link android.util.Log} class. You can use the
  * {@code SensorManager.getRotationMatrix()} method (and any other helpful
  * methods) as you would normally do on Android.
- * 
+ *
  * <p>
  * Note: Since this is a simulator, DO NOT create threads, DO NOT sleep(), or do
  * anything that can cause the simulator to stall/pause. You can however use
@@ -61,6 +61,7 @@ public class ActivityDetection {
 	private float acclBuffer[][] = new float[3][BUFFER_SIZE];
 	private int accIndex = 0;
 	private double walkSdev = 0;
+	private double walkAutoC = 0;
 	private double WALK_THRESHOLD = 1.5;
 
 	private boolean isWalking = false; //WALKING FLAG
@@ -104,7 +105,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the accelerometer sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param x
@@ -138,7 +139,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the gravity sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param x
@@ -155,7 +156,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the linear accelerometer sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param x
@@ -184,6 +185,7 @@ public class ActivityDetection {
 					1* 1000); // Delay in millisec (10 min)
 		}
 		walkSdev = getStandardDeviation();
+		walkAutoC = getAutoCorrelation();
 
 		if(walkSdev > WALK_THRESHOLD){
 			isWalking = true;
@@ -209,16 +211,60 @@ public class ActivityDetection {
 			sum += getMagnitude(j);
 		}
 		return sum / (float) BUFFER_SIZE;
-
 	}
 
 	double getMagnitude(int j) {
 		return Math.sqrt(Math.pow(acclBuffer[0][j], 2) + Math.pow(acclBuffer[1][j], 2) + Math.pow(acclBuffer[2][j], 2));
 	}
 
+	float getMean1(float inputArray[][], int size) {
+		double sum = 0.0;
+		for (int j = 0; j < BUFFER_SIZE; j++) {
+			sum += getMagnitude1(j);
+		}
+		return sum / (float) BUFFER_SIZE;
+	}
+
+	double getMagnitude1(float inputArray[][],int j) {
+		return Math.sqrt(Math.pow(acclBuffer[0][j], 2) + Math.pow(acclBuffer[1][j], 2) + Math.pow(acclBuffer[2][j], 2));
+	}
+
+	double getAutoCorrelation(){
+		float maxCorrelation = 0;
+		float tempCorrelation = 0;
+		float tempMean = 0;
+		float denom = 0;
+		float num = 0;
+		float windowArray[][];
+		int actualIndex = (accIndex+1)%BUFFER_SIZE;
+		int endIndex;
+		for(int i=2; i<=BUFFER_SIZE; i++){ //window size
+			actualIndex = (accIndex+1)%BUFFER_SIZE
+			windowArray = new float[3][i];
+			for (int j = 0; j<i; j++) { // iterate over the window
+					windowArray[0][actualIndex] = acclBuffer[0][actualIndex];
+					windowArray[1][actualIndex] = acclBuffer[1][actualIndex];
+					windowArray[2][actualIndex] = acclBuffer[2][actualIndex];
+					actualIndex = (actualIndex+1)%BUFFER_SIZE;
+			}
+			tempMean = getMean1();
+			for (int k=0; k<i; k++) {
+				denom += Math.pow((getMagnitude1(windowArray, k)-tempMean), 2);
+			}
+			for (int l=0; l<i-1; l++) {
+				num += (getMagnitude1(windowArray, l)-tempMean) * (getMagnitude1(windowArray, l+1)-tempMean);
+			}
+			tempCorrelation = num/denom;
+			if (tempCorrelation > maxCorrelation) {
+				maxCorrelation = tempCorrelation;
+			}
+		}
+		return maxCorrelation;
+	}
+
 	/**
 	 * Called when the magnetic sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param x
@@ -235,7 +281,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the gyroscope sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param x
@@ -252,7 +298,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the rotation vector sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param x
@@ -271,7 +317,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the barometer sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param pressure
@@ -297,7 +343,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the light sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param light
@@ -320,7 +366,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the proximity sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this sensor event
 	 * @param proximity
@@ -338,7 +384,7 @@ public class ActivityDetection {
 
 	/**
 	 * Called when the location sensor has changed.
-	 * 
+	 *
 	 * @param timestamp
 	 *            Timestamp of this location event
 	 * @param provider
@@ -459,12 +505,12 @@ public class ActivityDetection {
 					if (isLocationGPS) {
 						if (isMoving) {
 							currentActivity = UserActivities.BUS;
-						}      			
+						}
 					} else {
 						if (isUnderground) {
 							currentActivity = UserActivities.BUS;
 						}
-					} 
+					}
 				}
 				break;
 
@@ -474,7 +520,7 @@ public class ActivityDetection {
 					if (isLocationGPS) {
 						if (isMoving) {
 							currentActivity = UserActivities.BUS;
-						}      			
+						}
 					} else {
 						if (isUnderground) {
 							currentActivity = UserActivities.BUS;
@@ -486,7 +532,7 @@ public class ActivityDetection {
 					}else{
 						currentActivity = UserActivities.IDLE_INDOOR;
 					}
-				} 
+				}
 				break;
 
 				// can change to walking;
