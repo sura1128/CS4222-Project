@@ -217,10 +217,10 @@ public class ActivityDetection {
 		return Math.sqrt(Math.pow(acclBuffer[0][j], 2) + Math.pow(acclBuffer[1][j], 2) + Math.pow(acclBuffer[2][j], 2));
 	}
 
-	float getMean1(float inputArray[][], int size) {
+	double getMean1(float inputArray[][], int size) {
 		double sum = 0.0;
 		for (int j = 0; j < BUFFER_SIZE; j++) {
-			sum += getMagnitude1(j);
+			sum += getMagnitude1(inputArray,j);
 		}
 		return sum / (float) BUFFER_SIZE;
 	}
@@ -232,14 +232,14 @@ public class ActivityDetection {
 	double getAutoCorrelation(){
 		float maxCorrelation = 0;
 		float tempCorrelation = 0;
-		float tempMean = 0;
+		double tempMean = 0;
 		float denom = 0;
 		float num = 0;
 		float windowArray[][];
 		int actualIndex = (accIndex+1)%BUFFER_SIZE;
 		int endIndex;
 		for(int i=2; i<=BUFFER_SIZE; i++){ //window size
-			actualIndex = (accIndex+1)%BUFFER_SIZE
+			actualIndex = (accIndex+1)%BUFFER_SIZE;
 			windowArray = new float[3][i];
 			for (int j = 0; j<i; j++) { // iterate over the window
 					windowArray[0][actualIndex] = acclBuffer[0][actualIndex];
@@ -247,7 +247,7 @@ public class ActivityDetection {
 					windowArray[2][actualIndex] = acclBuffer[2][actualIndex];
 					actualIndex = (actualIndex+1)%BUFFER_SIZE;
 			}
-			tempMean = getMean1();
+			tempMean = getMean1(windowArray, i);
 			for (int k=0; k<i; k++) {
 				denom += Math.pow((getMagnitude1(windowArray, k)-tempMean), 2);
 			}
