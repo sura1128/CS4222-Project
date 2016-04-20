@@ -186,6 +186,7 @@ public class ActivityDetection {
 		}
 		walkSdev = getStandardDeviation();
 		walkAutoC = getAutoCorrelation();
+		System.out.println(walkAutoC);
 
 		if(walkSdev > WALK_THRESHOLD){
 			isWalking = true;
@@ -240,12 +241,14 @@ public class ActivityDetection {
 		int endIndex;
 		for(int i=2; i<=BUFFER_SIZE; i++){ //window size
 			actualIndex = (accIndex+1)%BUFFER_SIZE;
+			System.out.println("i " + i + " actualindex " + actualIndex + "  accIndex = " + accIndex);
 			windowArray = new float[3][i];
 			for (int j = 0; j<i; j++) { // iterate over the window
-					windowArray[0][actualIndex] = acclBuffer[0][actualIndex];
-					windowArray[1][actualIndex] = acclBuffer[1][actualIndex];
-					windowArray[2][actualIndex] = acclBuffer[2][actualIndex];
+					windowArray[0][actualIndex-i] = acclBuffer[0][actualIndex-i];
+					windowArray[1][actualIndex-i] = acclBuffer[1][actualIndex-i];
+					windowArray[2][actualIndex-i] = acclBuffer[2][actualIndex-i];
 					actualIndex = (actualIndex+1)%BUFFER_SIZE;
+					System.out.println(" actual = " + actualIndex);
 			}
 			tempMean = getMean1(windowArray, i);
 			for (int k=0; k<i; k++) {
