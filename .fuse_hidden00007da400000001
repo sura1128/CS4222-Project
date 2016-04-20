@@ -1,0 +1,19 @@
+cd ./ActivitySim
+echo "\n....jarifying sim....\n"
+ant jarify
+echo "\n....running sim....\n"
+
+for entry in "../Traces"/*
+do
+	java -jar ActivitySim.jar ../Traces/$entry
+done
+
+cd ../ActivityEval
+echo "\n....jarifying eval....\n"
+ant jarify
+echo "\n....running eval....\n"
+for entry in "../Traces"/*¬
+do¬
+	echo "\n....FOR $entry NOW....\n"¬
+	java -jar ActivityEval.jar ../Traces/$entry¬
+done¬

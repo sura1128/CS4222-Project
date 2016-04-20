@@ -2,13 +2,21 @@ cd ./ActivitySim
 echo "\n....jarifying sim....\n"
 ant jarify
 echo "\n....running sim....\n"
-java -jar ActivitySim.jar ../nexus4
-java -jar ActivitySim.jar ../nexus5
+
+for entry in "../Traces"/*
+do
+	echo "\n.... SIMULATING $entry ....\n"
+	java -jar ActivitySim.jar ../Traces/$entry
+done
+
 cd ../ActivityEval
 echo "\n....jarifying eval....\n"
 ant jarify
 echo "\n....running eval....\n"
-java -jar ActivityEval.jar ../nexus4 
-echo "\n....FOR NEXUS 5 NOW....\n"
-java -jar ActivityEval.jar ../nexus5 
+
+for entry in "../Traces"/*
+do
+	echo "\n.... EVALUATING $entry ....\n"
+	java -jar ActivityEval.jar ../Traces/$entry
+done
 

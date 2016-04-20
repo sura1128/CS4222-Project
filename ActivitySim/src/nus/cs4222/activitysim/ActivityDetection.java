@@ -57,15 +57,16 @@ public class ActivityDetection {
 	private UserActivities currentActivity = UserActivities.IDLE_INDOOR;
 
 	// ACCELEROMETER
-	private int BUFFER_SIZE = 200;
+	private int BUFFER_SIZE = 400;
+	private int ACCL_FILTER_BUFF_SIZE = 10;
 	private double acclBuffer[] = new double[BUFFER_SIZE];
-	private double acclFilter[] = new double[10];
+	private double acclFilter[] = new double[ACCL_FILTER_BUFF_SIZE];
 	private int accFilterIndex = 0;
 	private int accIndex = 0;
 	private double walkSdev = 0;
 	private double walkAutoC = 0;
 	private double WALK_THRESHOLD = 1.5;
-	private double WALK_THRESHOLD_correlation = 0.85;
+	private double WALK_THRESHOLD_correlation = 0.86;
 
 	private boolean isWalking = false; //WALKING FLAG
 
@@ -174,7 +175,7 @@ public class ActivityDetection {
 	public void onLinearAcclSensorChanged(long timestamp, float x, float y, float z, int accuracy) {
 
 		accIndex = accIndex % BUFFER_SIZE;		
-		accFilterIndex = accFilterIndex % 10;
+		accFilterIndex = accFilterIndex % ACCL_FILTER_BUFF_SIZE;
 		acclFilter[accFilterIndex] = getMagnitude(x,y,z);
 		acclBuffer[accIndex] = getMedian(acclFilter);
 		accFilterIndex++;
@@ -238,7 +239,7 @@ public class ActivityDetection {
 			shiftedArray[i] = acclBuffer[actualIndex];
 			actualIndex = (actualIndex+1)%BUFFER_SIZE;
 		}
-		for(int window_size=10; window_size<(BUFFER_SIZE/2); window_size++){ //k is the window size
+		for(int window_size=30; window_size<(BUFFER_SIZE/2); window_size++){ //k is the window size
 			doubleWindow = (double)window_size;
 			mean1 = 0;
 			mean2 = 0;
