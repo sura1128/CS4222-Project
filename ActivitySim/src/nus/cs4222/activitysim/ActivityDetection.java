@@ -65,6 +65,7 @@ public class ActivityDetection {
 	private double walkSdev = 0;
 	private double walkAutoC = 0;
 	private double WALK_THRESHOLD = 1.5;
+	private double WALK_THRESHOLD_correlation = 0.85;
 
 	private boolean isWalking = false; //WALKING FLAG
 
@@ -186,11 +187,11 @@ public class ActivityDetection {
 			timer.schedule(this.task, // Task to be executed
 					1* 1000); // Delay in millisec (10 min)
 		}
-		walkSdev = getStandardDeviation();
+		//walkSdev = getStandardDeviation();
 		walkAutoC = getAutoCorrelation();
-		System.out.println("Autocorrelation = " + walkAutoC);
+		//System.out.println("Autocorrelation = " + walkAutoC);
 
-		if(walkSdev > WALK_THRESHOLD){
+		if(walkAutoC > WALK_THRESHOLD_correlation){
 			isWalking = true;
 		}else {
 			isWalking = false;
