@@ -57,7 +57,7 @@ public class ActivityDetection {
 	private UserActivities currentActivity = UserActivities.IDLE_INDOOR;
 
 	// ACCELEROMETER
-	private int BUFFER_SIZE = 100;
+	private int BUFFER_SIZE = 200;
 	private float acclBuffer[][] = new float[3][BUFFER_SIZE];
 	private int accIndex = 0;
 	private double walkSdev = 0;
@@ -186,7 +186,7 @@ public class ActivityDetection {
 		}
 		walkSdev = getStandardDeviation();
 		walkAutoC = getAutoCorrelation();
-		System.out.println(walkAutoC);
+		System.out.println("Autocorrelation = " + walkAutoC);
 
 		if(walkSdev > WALK_THRESHOLD){
 			isWalking = true;
@@ -218,44 +218,55 @@ public class ActivityDetection {
 		return Math.sqrt(Math.pow(acclBuffer[0][j], 2) + Math.pow(acclBuffer[1][j], 2) + Math.pow(acclBuffer[2][j], 2));
 	}
 
-	double getMean1(double inputArray[], int size) {
-		double sum = 0.0;
-		for (int j = 0; j < size; j++) {
-			sum += inputArray[j];
-		}
-		return sum / (double) size;
-	}
-
-	double getMagnitude1(float inputArray[][],int j) {
-		return Math.sqrt(Math.pow(acclBuffer[0][j], 2) + Math.pow(acclBuffer[1][j], 2) + Math.pow(acclBuffer[2][j], 2));
-	}
-
 	double getAutoCorrelation(){
 		double maxCorrelation = 0;
 		double tempCorrelation = 0;
-		double tempMean = 0;
-		double denom = 0;
-		double num = 0;
-		double windowArray[];
+		double denominator = 0;
+		double numerator = 0;
+		double doubleWindow = 0;
+		double mean1 = 0;
+		double mean2 = 0;
+		double variance1 = 0;
+		double variance2 = 0;
+		double shiftedArray[] = new double[BUFFER_SIZE];
 		int actualIndex = (accIndex+1)%BUFFER_SIZE;
-		int endIndex;
-		for(int i=2; i<=BUFFER_SIZE; i++){ //window size
-			actualIndex = (accIndex+1)%BUFFER_SIZE;
-			//System.out.println("i " + i + " actualindex " + actualIndex + "  accIndex = " + accIndex);
-			windowArray = new double[i];
-			for (int j = 0; j<i; j++) { // iterate over the window
-				windowArray[j] = getMagnitude(actualIndex);
-				actualIndex = (actualIndex+1)%BUFFER_SIZE;
-				System.out.println(" actual = " + actualIndex);
+		// iterate over the buffer to create the adjusted array
+		for (int i = 0; i<BUFFER_SIZE; i++) { 
+			shiftedArray[i] = getMagnitude(actualIndex);
+			actualIndex = (actualIndex+1)%BUFFER_SIZE;
+		}
+		for(int window_size=2; window_size<(BUFFER_SIZE/2); window_size++){ //k is the window size
+			doubleWindow = (double)window_size;
+			mean1 = 0;
+			mean2 = 0;
+			variance1 = 0;
+			variance2 = 0;
+			/// calculate mean
+			for(int a = 0; a<window_size; a++){
+				mean1 += shiftedArray[a];
+				mean2 += shiftedArray[window_size+a];
 			}
-			tempMean = getMean1(windowArray, i);
-			for (int k=0; k<i; k++) {
-				denom += Math.pow((windowArray[k]-tempMean), 2);
+			mean1 /= doubleWindow;
+			mean2 /= doubleWindow;
+			// calculate variance
+			for (int b = 0; b<window_size; b++){
+				variance1 += Math.pow((shiftedArray[b] - mean1), 2);
+				variance2 += Math.pow((shiftedArray[window_size+b] - mean2), 2);
 			}
-			for (int l=0; l<i-1; l++) {
-				num += (windowArray[l] - tempMean) * (windowArray[l+1] - tempMean);
-			}
-			tempCorrelation = num/denom;
+			// not doing this since will need to divide the numerator by this anyways
+			// variance1 /= window_size;
+			// variance2 /= window_size;
+
+			numerator = 0;
+			denominator = 0;
+			// now calculate the numerator and denominator
+			for(int c=0; c<window_size; c++) {
+				numerator += (shiftedArray[c]-mean1) * (shiftedArray[window_size+c]-mean2);
+			};
+			denominator = Math.sqrt(variance1)*Math.sqrt(variance2);
+			//System.out.println("numerator = "+ numerator + ", denominator = " + denominator);
+			tempCorrelation = (numerator/denominator);
+			//System.out.println("window size = " + window_size + " AutoCorrelation = " + tempCorrelation);
 			if (tempCorrelation > maxCorrelation) {
 				maxCorrelation = tempCorrelation;
 			}
