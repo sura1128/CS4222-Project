@@ -58,7 +58,9 @@ public class ActivityDetection {
 
 	// ACCELEROMETER
 	private int BUFFER_SIZE = 200;
-	private float acclBuffer[][] = new float[3][BUFFER_SIZE];
+	private float acclBuffer[] = new float[BUFFER_SIZE];
+	private float acclFilter[] = new float[10];
+	private int accFilterIndex = 0;
 	private int accIndex = 0;
 	private double walkSdev = 0;
 	private double walkAutoC = 0;
@@ -170,11 +172,11 @@ public class ActivityDetection {
 	 */
 	public void onLinearAcclSensorChanged(long timestamp, float x, float y, float z, int accuracy) {
 
-		accIndex = accIndex % BUFFER_SIZE;
-
-		acclBuffer[0][accIndex] = x;
-		acclBuffer[1][accIndex] = y;
-		acclBuffer[2][accIndex] = z;
+		accIndex = accIndex % BUFFER_SIZE;		
+		accFilterIndex = accFilterIndex % 10;
+		acclFilter[accFilterIndex] = getMagnitude(accIndex);
+		acclBuffer[accIndex] = getMedian(acclFilter);
+		accFilterIndex++;
 		accIndex++;
 
 		// just to init everything
@@ -235,7 +237,7 @@ public class ActivityDetection {
 			shiftedArray[i] = getMagnitude(actualIndex);
 			actualIndex = (actualIndex+1)%BUFFER_SIZE;
 		}
-		for(int window_size=2; window_size<(BUFFER_SIZE/2); window_size++){ //k is the window size
+		for(int window_size=10; window_size<(BUFFER_SIZE/2); window_size++){ //k is the window size
 			doubleWindow = (double)window_size;
 			mean1 = 0;
 			mean2 = 0;
