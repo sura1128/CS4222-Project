@@ -58,8 +58,8 @@ public class ActivityDetection {
 
 	// ACCELEROMETER
 	private int BUFFER_SIZE = 200;
-	private float acclBuffer[] = new float[BUFFER_SIZE];
-	private float acclFilter[] = new float[10];
+	private double acclBuffer[] = new double[BUFFER_SIZE];
+	private double acclFilter[] = new double[10];
 	private int accFilterIndex = 0;
 	private int accIndex = 0;
 	private double walkSdev = 0;
@@ -88,9 +88,9 @@ public class ActivityDetection {
 	private float LIGHT_THRESHOLD_INDOOR = 220;
 	private float LIGHT_THRESHOLD_OUTDOOR = 350;
 	private int LIGHT_BUFF_SIZE = 20;
-	private float lightSensorFilter[] = new float[LIGHT_BUFF_SIZE];
+	private double lightSensorFilter[] = new double[LIGHT_BUFF_SIZE];
 	private int lightIndex = 0;
-	private float lightSensorClean = 0;
+	private double lightSensorClean = 0;
 
 	private boolean isUserOutside = false;
 
@@ -100,9 +100,9 @@ public class ActivityDetection {
 	//BAROMETER
 	private boolean isUnderground = false;
 	private int BAROMETER_BUFFER_SIZE = 20;
-	private float barometerFilter[] = new float[BAROMETER_BUFFER_SIZE];
+	private double barometerFilter[] = new double[BAROMETER_BUFFER_SIZE];
 	private int baroIndex = 0;
-	private float medianHeight = 0;
+	private double medianHeight = 0;
 	private float HEIGHT_THRESHOLD = -5;
 
 	/**
@@ -174,7 +174,7 @@ public class ActivityDetection {
 
 		accIndex = accIndex % BUFFER_SIZE;		
 		accFilterIndex = accFilterIndex % 10;
-		acclFilter[accFilterIndex] = getMagnitude(accIndex);
+		acclFilter[accFilterIndex] = getMagnitude(x,y,z);
 		acclBuffer[accIndex] = getMedian(acclFilter);
 		accFilterIndex++;
 		accIndex++;
@@ -202,7 +202,7 @@ public class ActivityDetection {
 		double mean = getMean();
 		double sum = 0.0;
 		for (int i = 0; i < BUFFER_SIZE; i++) {
-			sum += Math.pow((getMagnitude(i) - mean), 2);
+			sum += Math.pow((acclBuffer[i] - mean), 2);
 		}
 		double stdDev = Math.sqrt((1.0 / (double)BUFFER_SIZE) * sum);
 		return stdDev;
@@ -211,13 +211,13 @@ public class ActivityDetection {
 	double getMean() {
 		double sum = 0.0;
 		for (int j = 0; j < BUFFER_SIZE; j++) {
-			sum += getMagnitude(j);
+			sum += acclBuffer[j];
 		}
 		return sum / (float) BUFFER_SIZE;
 	}
 
-	double getMagnitude(int j) {
-		return Math.sqrt(Math.pow(acclBuffer[0][j], 2) + Math.pow(acclBuffer[1][j], 2) + Math.pow(acclBuffer[2][j], 2));
+	double getMagnitude(float x, float y, float z) {
+		return Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
 	}
 
 	double getAutoCorrelation(){
@@ -234,7 +234,7 @@ public class ActivityDetection {
 		int actualIndex = (accIndex+1)%BUFFER_SIZE;
 		// iterate over the buffer to create the adjusted array
 		for (int i = 0; i<BUFFER_SIZE; i++) { 
-			shiftedArray[i] = getMagnitude(actualIndex);
+			shiftedArray[i] = acclBuffer[actualIndex];
 			actualIndex = (actualIndex+1)%BUFFER_SIZE;
 		}
 		for(int window_size=10; window_size<(BUFFER_SIZE/2); window_size++){ //k is the window size
@@ -497,7 +497,7 @@ public class ActivityDetection {
 		return r * theta;
 	}
 
-	private float getMedian(float in_array[]) {
+	private double getMedian(double in_array[]) {
 		Arrays.sort(in_array);
 		int size = in_array.length;
 		if (size % 2 == 0) {
