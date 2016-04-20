@@ -218,12 +218,12 @@ public class ActivityDetection {
 		return Math.sqrt(Math.pow(acclBuffer[0][j], 2) + Math.pow(acclBuffer[1][j], 2) + Math.pow(acclBuffer[2][j], 2));
 	}
 
-	double getMean1(float inputArray[][], int size) {
+	double getMean1(double inputArray[], int size) {
 		double sum = 0.0;
-		for (int j = 0; j < BUFFER_SIZE; j++) {
-			sum += getMagnitude1(inputArray,j);
+		for (int j = 0; j < size; j++) {
+			sum += inputArray[j];
 		}
-		return sum / (float) BUFFER_SIZE;
+		return sum / (double) size;
 	}
 
 	double getMagnitude1(float inputArray[][],int j) {
@@ -231,31 +231,29 @@ public class ActivityDetection {
 	}
 
 	double getAutoCorrelation(){
-		float maxCorrelation = 0;
-		float tempCorrelation = 0;
+		double maxCorrelation = 0;
+		double tempCorrelation = 0;
 		double tempMean = 0;
-		float denom = 0;
-		float num = 0;
-		float windowArray[][];
+		double denom = 0;
+		double num = 0;
+		double windowArray[];
 		int actualIndex = (accIndex+1)%BUFFER_SIZE;
 		int endIndex;
 		for(int i=2; i<=BUFFER_SIZE; i++){ //window size
 			actualIndex = (accIndex+1)%BUFFER_SIZE;
-			System.out.println("i " + i + " actualindex " + actualIndex + "  accIndex = " + accIndex);
-			windowArray = new float[3][i];
+			//System.out.println("i " + i + " actualindex " + actualIndex + "  accIndex = " + accIndex);
+			windowArray = new double[i];
 			for (int j = 0; j<i; j++) { // iterate over the window
-					windowArray[0][actualIndex-i] = acclBuffer[0][actualIndex-i];
-					windowArray[1][actualIndex-i] = acclBuffer[1][actualIndex-i];
-					windowArray[2][actualIndex-i] = acclBuffer[2][actualIndex-i];
-					actualIndex = (actualIndex+1)%BUFFER_SIZE;
-					System.out.println(" actual = " + actualIndex);
+				windowArray[j] = getMagnitude(actualIndex);
+				actualIndex = (actualIndex+1)%BUFFER_SIZE;
+				System.out.println(" actual = " + actualIndex);
 			}
 			tempMean = getMean1(windowArray, i);
 			for (int k=0; k<i; k++) {
-				denom += Math.pow((getMagnitude1(windowArray, k)-tempMean), 2);
+				denom += Math.pow((windowArray[k]-tempMean), 2);
 			}
 			for (int l=0; l<i-1; l++) {
-				num += (getMagnitude1(windowArray, l)-tempMean) * (getMagnitude1(windowArray, l+1)-tempMean);
+				num += (windowArray[l] - tempMean) * (windowArray[l+1] - tempMean);
 			}
 			tempCorrelation = num/denom;
 			if (tempCorrelation > maxCorrelation) {
