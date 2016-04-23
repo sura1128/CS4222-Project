@@ -57,16 +57,16 @@ public class ActivityDetection {
 	private UserActivities currentActivity = UserActivities.IDLE_INDOOR;
 
 	// ACCELEROMETER
-	private int BUFFER_SIZE = 400;
-	private int ACCL_FILTER_BUFF_SIZE = 10;
+	private int BUFFER_SIZE = 200;
+	private int BUFFER_SIZE_ACCL_FILTER = 10;
 	private double acclBuffer[] = new double[BUFFER_SIZE];
-	private double acclFilter[] = new double[ACCL_FILTER_BUFF_SIZE];
+	private double acclFilter[] = new double[BUFFER_SIZE_ACCL_FILTER];
 	private int accFilterIndex = 0;
 	private int accIndex = 0;
 	private double walkSdev = 0;
 	private double walkAutoC = 0;
-	private double WALK_THRESHOLD = 1.5;
-	private double WALK_THRESHOLD_correlation = 0.86;
+	private double WALK_THRESHOLD = 1.3;
+	private double WALK_THRESHOLD_correlation = 0.65;
 
 	private boolean isWalking = false; //WALKING FLAG
 
@@ -82,7 +82,7 @@ public class ActivityDetection {
 
 	//VEHICLE
 	private double userSpeed=0;
-	private double SPEED_THRESHOLD = 2.72;
+	private double SPEED_THRESHOLD = 2.7;
 	private boolean isMoving = false; //VEHICLE FLAG
 	private boolean isLocationGPS = false;
 
@@ -100,6 +100,8 @@ public class ActivityDetection {
 	private boolean isInPocket = false;
 
 	//BAROMETER
+	private double UNDER_THRESH = -5;
+	private double OVER_THRESH = -3;
 	private boolean isUnderground = false;
 	private int BAROMETER_BUFFER_SIZE = 20;
 	private double barometerFilter[] = new double[BAROMETER_BUFFER_SIZE];
@@ -175,7 +177,7 @@ public class ActivityDetection {
 	public void onLinearAcclSensorChanged(long timestamp, float x, float y, float z, int accuracy) {
 
 		accIndex = accIndex % BUFFER_SIZE;		
-		accFilterIndex = accFilterIndex % ACCL_FILTER_BUFF_SIZE;
+		accFilterIndex = accFilterIndex % BUFFER_SIZE_ACCL_FILTER;
 		acclFilter[accFilterIndex] = getMagnitude(x,y,z);
 		acclBuffer[accIndex] = getMedian(acclFilter);
 		accFilterIndex++;
@@ -188,17 +190,18 @@ public class ActivityDetection {
 			timer.schedule(this.task, // Task to be executed
 					1* 1000); // Delay in millisec (10 min)
 		}
-		//walkSdev = getStandardDeviation();
+		walkSdev = getStandardDeviation();
 		walkAutoC = getAutoCorrelation();
 		//System.out.println("Autocorrelation = " + walkAutoC);
 
-		if(walkAutoC > WALK_THRESHOLD_correlation){
+		//if(walkAutoC > WALK_THRESHOLD_correlation){
+		if (walkSdev > WALK_THRESHOLD || walkAutoC > WALK_THRESHOLD_correlation){	
 			isWalking = true;
 		}else {
 			isWalking = false;
 		}
 
-	}
+		}
 
 	double getStandardDeviation() {
 		double mean = getMean();
@@ -350,11 +353,19 @@ public class ActivityDetection {
 		medianHeight = getMedian(barometerFilter);
 		baroIndex++;
 
-		if (medianHeight < HEIGHT_THRESHOLD) {
-			isUnderground = true;
-		} else {
-			isUnderground = false;
+		if(isUnderground){
+			if(medianHeight > OVER_THRESH){
+				isUnderground = false;
+			}
+		}else{
+			if(medianHeight < UNDER_THRESH)
+				isUnderground = true;
 		}
+		//if (medianHeight < HEIGHT_THRESHOLD) {
+		//	isUnderground = true;
+		//} else {
+		//	isUnderground = false;
+		//}
 	}
 
 	/**
@@ -515,37 +526,40 @@ public class ActivityDetection {
 			// can change to walk or vehicle
 			case IDLE_INDOOR:
 			case IDLE_OUTDOOR:
-				if (isWalking) {
-					currentActivity = UserActivities.WALKING;
+				if (isLocationGPS) {
+					if (isMoving) {
+						currentActivity = UserActivities.BUS;
+						break;
+					}
 				} else {
-					if (isLocationGPS) {
-						if (isMoving) {
-							currentActivity = UserActivities.BUS;
-						}
-					} else {
-						if (isUnderground) {
-							currentActivity = UserActivities.BUS;
-						}
+					if (isUnderground) {
+						currentActivity = UserActivities.BUS;
+						break;
 					}
 				}
+				if (isWalking) {
+					currentActivity = UserActivities.WALKING;
+				}
+
 				break;
 
 				// can change to idle or vehicle
 			case WALKING:
-				if (!isWalking) {
-					if (isLocationGPS) {
-						if (isMoving) {
-							currentActivity = UserActivities.BUS;
-						}
-					} else {
-						if (isUnderground) {
-							currentActivity = UserActivities.BUS;
-						}
+				if (isLocationGPS) {
+					if (isMoving) {
+						currentActivity = UserActivities.BUS;
+						break;
 					}
 				} else {
-					if(isUserOutside){
+					if (isUnderground) {
+						currentActivity = UserActivities.BUS;
+						break;
+					}
+				}
+				if (!isWalking) {
+					if (isUserOutside) {
 						currentActivity = UserActivities.IDLE_OUTDOOR;
-					}else{
+					} else {
 						currentActivity = UserActivities.IDLE_INDOOR;
 					}
 				}
@@ -620,4 +634,4 @@ public class ActivityDetection {
 			}
 		}
 	};
-}
+	}
